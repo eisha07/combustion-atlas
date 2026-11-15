@@ -1,97 +1,130 @@
 # Combustion Atlas
 
-An AI-assisted dashboard that ranks and explains NASA PSI combustion investigations for fire safety in crew habitats.
+**An AI-assisted dashboard that ranks and explains NASA's microgravity combustion investigations by how much they matter for fire safety where crews live.**
 
-```
-combustion-atlas/
-├── public/                 the website (static files)
-│   ├── index.html          layout + styles for both views
-│   ├── app.js              all behaviour: 3D map, ranking, charts, pins, tour, AI guide
-│   ├── data.js             the 26 PSI records, habitats, weights, roles  ← edit data here
-│   ├── config.js           where the AI guide sends questions
-│   └── vendor/three.min.js 3D library (three.js r128, MIT licence included)
-├── api/ask.js              AI endpoint for Vercel (serverless function)
-├── server.js               AI endpoint + static server for any Node host
-├── lib/guide.js            shared AI logic: prompt, input checks, rate limit, Anthropic call
-├── package.json
-├── vercel.json
-└── .env.example            the settings the server needs
-```
+Built for the NASA Physical Sciences Informatics (PSI) challenge: summarize, rank and interpret PSI combustion research to inform fire safety for spacecraft, space stations, lunar and Martian bases, pressurized rovers and spacesuits, and fire safety back on Earth.
 
-## How the AI guide works when self-hosted
+Audience: professors, graduate and undergraduate students, aerospace researchers and aerospace engineers. Each role gets its own guide.
 
-The browser never sees your API key. The page sends the question plus the user's role, habitat and scores to `/api/ask`.
-The server builds the guide's instructions from `public/data.js`, calls your chosen AI service with your key (Anthropic by default, or any OpenAI-compatible service), and returns the answer.
-If the answer uses a tool (fly to an investigation, pin for comparison, switch habitat), the page runs it and sends the result back, up to 4 rounds.
+---
 
-The endpoint only serves this guide: the server writes the system prompt, accepts only the three dashboard tools, caps message size, and rate-limits each visitor (30 requests per 10 minutes by default).
+## The data
 
-If the endpoint is missing or fails, the guide falls back to answering from the dashboard's own data, so the site never breaks.
+- **Source:** NASA PSI combustion investigation search, 26 records read on 15 Nov 2026: **20 flight investigations** (ISS, Cygnus, Space Shuttle) and **6 ground studies** that reuse flight data.
+- **Curated per investigation:** objective, fire-safety takeaway, fuels, sample or burner size, O₂ concentration, pressure, airflow, what was varied, what was held constant, sensors and measurements, team, related investigations, Earth benefit, and a link to the PSI record.
+- **Hardware families**, as grouped in the brief:
+  - **ACME in the Combustion Integrated Rack (CIR):** BRE, CFI-G, Flame Design, s-Flame, CLD Flame, E-FIELD (gaseous flames)
+  - **MDCA in the CIR:** FLEX, FLEX-2, CFI (burning droplets)
+  - **MSG flow duct built for SPICE:** BASS, BASS-II, SPICE, SLICE (solid and gaseous fuels)
+  - **Saffire on Cygnus:** Saffire-I, II, III (large-scale spacecraft fires)
+  - **Smoke & aerosol:** SAME, SAME-R, DAFT/DAFT-2 (one instrument used for both smoke and dust)
+- **Honest gaps:** values a PSI record does not state are shown as "not in summary" and drawn dashed, never guessed.
 
-## What you need
+## How investigations are ranked
 
-1. **An API key** for one AI service. The default is Anthropic (a key from the [Claude Console](https://platform.claude.com), Settings → API keys), but any OpenAI-compatible service works: see "Using a different AI service" below. Set a monthly spend limit wherever you can.
-2. **A GitHub account** (to push the code) and **a free Vercel account**, or any host that runs Node 18+.
-3. **Node 18 or newer** if you want to run it on your own computer first.
+Each investigation is rated 0–1 on six dimensions. The relevance score (0–100) is a weighted average, and **the weights change with the crew environment you choose**:
 
-## Option A: Vercel (recommended, free tier, site + AI in one)
+| Dimension | Captures | Rated highest for |
+| --- | --- | --- |
+| Material flammability | Whether materials burn and spread | BRE, BASS-II, Saffire |
+| Detection | Smoke, particles, sensor response | SAME, SAME-R |
+| Suppression & extinction | Suppressants, extinction limits | FLEX |
+| Elevated O₂ / low pressure | Exploration-atmosphere relevance | BRE, CFI-G |
+| Scale realism | How realistic the fire is | Saffire |
+| Model-validation data | Benchmarks for simulations | CLD Flame, s-Flame, FLEX-2 |
 
-1. Push this folder to a new GitHub repository (keep `.env` out; `.gitignore` already does this).
-2. In Vercel: **Add New → Project → Import** your repository. Framework preset: **Other**. Leave build command empty. Output directory is set to `public` by `vercel.json`.
-3. Under **Settings → Environment Variables**, add `AI_API_KEY` = your key (plus `AI_PROVIDER`, `AI_MODEL` and `AI_BASE_URL` if you use another service). Optional: `ALLOWED_ORIGIN` = your site address (e.g. `https://combustion-atlas.vercel.app`) once you know it.
-4. **Deploy.** Open the address Vercel gives you and ask the guide a question to check it.
-
-## Option B: any Node host (Render, Railway, Fly.io, a VPS) or your laptop
-
-```bash
-npm install
-cp .env.example .env        # then paste your key into .env
-npm start                   # → http://localhost:3000
-```
-
-On Render or Railway: create a **Web Service** from your repo, build command `npm install`, start command `npm start`, and add `AI_API_KEY` (and the other `AI_` settings if needed) in the service's environment settings. The host sets `PORT` automatically.
-
-## Option C: static only (GitHub Pages, Netlify Drop, any file host), no live AI
-
-1. In `public/config.js` set `aiEndpoint: null`.
-2. Upload the contents of `public/` (GitHub Pages: push and choose the `public` folder, or copy its files to the repo root).
-
-Everything works except live AI answers; the guide answers from the dashboard's own data instead.
-
-## Using a different AI service
-
-The page always talks to your own `/api/ask`; only the server changes. Set `AI_PROVIDER=openai` to use any service with an OpenAI-compatible chat API, and the server translates the guide's messages and tool calls for it.
-
-| Service | `AI_PROVIDER` | `AI_BASE_URL` | Key from |
+| Crew environment | Pressure | O₂ | Weighs most |
 | --- | --- | --- | --- |
-| Anthropic (default) | `anthropic` | not needed | Claude Console |
-| OpenAI | `openai` | `https://api.openai.com/v1` | OpenAI platform |
-| Google Gemini | `openai` | `https://generativelanguage.googleapis.com/v1beta/openai` | Google AI Studio |
-| Groq | `openai` | `https://api.groq.com/openai/v1` | Groq console |
-| OpenRouter | `openai` | `https://openrouter.ai/api/v1` | OpenRouter |
-| Ollama (on your own computer) | `openai` | `http://localhost:11434/v1` | no key; put any text |
+| Spacecraft / ISS | 14.7 psia | 21% | Flammability, detection, suppression, scale |
+| Lunar base | 10.2 psia | 30% | Elevated O₂, flammability |
+| Pressurized rover | 10.2 psia | 30% | Elevated O₂, detection, suppression |
+| Mars base (assumed) | 10.2 psia | 30% | Flammability, elevated O₂, suppression |
+| Spacesuit | 4.3 psia | 100% | Elevated O₂ |
+| Earth applications | 14.7 psia | 20.9% | Detection, suppression |
 
-Set `AI_MODEL` to a model name from that service's model list, and pick one that supports **tool / function calling** (the guide uses it to fly the map, pin and switch habitat). Smaller free models may answer less accurately or skip the tools; the dashboard still works either way.
+The ratings are an editorial judgement, and users can re-weight them live with six sliders.
 
-## Settings (environment variables)
+---
 
-| Name | Required | Default | What it does |
-| --- | --- | --- | --- |
-| `AI_API_KEY` | yes | none | Your key for the chosen service; stays on the server (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` also accepted) |
-| `AI_PROVIDER` | no | `anthropic` | `anthropic` or `openai` (any OpenAI-compatible service) |
-| `AI_MODEL` | for `openai` | `claude-sonnet-5-5` for Anthropic | Model the guide uses |
-| `AI_BASE_URL` | for non-OpenAI `openai` services | `https://api.openai.com/v1` | The service's OpenAI-compatible address |
-| `MAX_TOKENS` | no | 4000 (Anthropic) / 1200 (others) | Upper limit per reply |
-| `RATE_LIMIT_PER_10_MIN` | no | `30` | Questions per visitor per 10 minutes, per server instance |
-| `ALLOWED_ORIGIN` | no | none | If set, only requests from this site address are answered |
+## Features
 
-## Editing the data
+### Explore
+- **3D constellation:** every investigation is a star orbiting a ring for its hardware family. Star size and glow show relevance; beams point from a central "habitat" to the top five. Lines link related studies, and small moons are ground studies that reused flight data.
+- **Controls:** drag or swipe to rotate, scroll or pinch to zoom, click or tap a star to select it. The view slowly auto-rotates when idle.
+- **Role picker ("I am"):** changes the guide's persona, its guided route, suggested questions and (for students and professors) glossary hover-terms.
+- **Habitat picker ("Protecting"):** re-ranks everything and updates every chart, card and insight for that atmosphere.
 
-All content lives in `public/data.js`. Each investigation is one record; its six ratings (`s: {F, D, S, O, R, M}`, each 0–1) drive the ranking.
-A new record appears on the 3D map, in the ranking, the charts and the AI guide's catalog without other changes.
+### Rank and filter
+- Top three on screen; the full list of 20 in a drawer with a bar per investigation showing which dimensions drive its score.
+- Filter by fuel phase: gas, liquid, solid, smoke and aerosol.
+- **Tune the ranking:** six sliders re-rank live; one click resets to the habitat's weights.
 
-## Notes
+### Understand one investigation
+- **Card:** relevance score, fire-safety takeaway, and an **O₂ coverage pill** (green: tested at or above the habitat's O₂; amber: close; red: short), plus whether the habitat's pressure was tested.
+- **Animated specimen view:** a schematic of the experiment itself: spherical and cool flames, a droplet burning down by the d² law, coflow jet flames, electric-field flames, a flat burner that keeps burning in elevated O₂, a flame front spreading over fabric, smoke particles growing, dust aerosol.
+- **Full dossier:** objective, fuels, sample size, O₂, pressure, flow, team, **what was varied vs held constant**, sensors, a radar chart of why it ranks where it does, connected studies, and the PSI link.
 
-- Data: NASA Physical Sciences Informatics, combustion investigation search (read 15 Nov 2026). Descriptions are paraphrased; relevance scores are an editorial weighting.
-- Fonts load from Google Fonts; everything else is served from your own host.
-- Never put the API key in `public/` or commit `.env`.
+### Compare
+- **Pin up to three** investigations. Each pinned star gets a small astronaut standing on it with a flag and shadow.
+- **Comparison bench:** side-by-side hardware, fuels, sample, O₂, pressure, flow, variables and sensors. Identical cells are shaded; terms shared by some are highlighted.
+
+### Analyse (four chapters)
+1. **Oxygen & pressure envelope:** every test's O₂ and pressure range against crew atmospheres, with constant-ppO₂ curves. It shows the key gap: a 30% O₂ lunar cabin has nearly Earth's oxygen partial pressure, BRE flames that self-extinguished at 21% kept burning at 26.5–34%, yet every solid-material flight test stayed at or below 21%.
+2. **Gravity spectrum:** microgravity and 1-g data bracket the Moon (0.17 g) and Mars (0.38 g), where no PSI combustion data exists yet. E-FIELD's ion wind is a partial-gravity analog; LUCI and FM2 are planned.
+3. **Comparison bench** (above).
+4. **Back to Earth:** spin-offs such as water-mist extinguishers, smoke detection, firefighter gear, material standards, wildfire and building models, cleaner engines and confined spaces, each linked to its investigations.
+
+### Ask
+- **Role guide:** a persona per role (Fire-safety systems engineer, Modeling liaison, Course architect, Thesis scout, Lab partner) with a five-stop guided route and suggested questions.
+- **Grounded AI answers:** answers come only from the dashboard's PSI catalog, cite PSI IDs, and say when PSI does not state something.
+- **Acts on the dashboard:** the guide can fly to an investigation, pin investigations for comparison, or switch the habitat, and lists what it did.
+- **Always answers:** if the AI service is unavailable, the guide answers from the dashboard's own data and says why.
+
+### Learn the tool
+- **Guided tour** on first visit (and from the **?** button): "What brings you here?" goal shortcuts, then 11 spotlight steps explaining each feature and when to use it.
+
+### Two views
+- **Dark:** deep space, with a faint painted cyanotype-and-galaxy backdrop behind the chapters.
+- **Light:** vintage-poster orange with cream cards, a red planet and drifting rocks behind the constellation, and a grainy thermal-image backdrop behind the chapters.
+- All artwork (planet, rocks, galaxy, specimens, astronaut) is drawn in code.
+
+---
+
+## Quality and design choices
+
+- **Calm by design:** one full-screen view; detail opens only when asked (top 3 → card → full dossier).
+- **Readable in both views:** separate colour palettes for the 3D view and for charts, cream backings for text on orange, dark panels for charts over the backdrop.
+- **Accessible:** keyboard focus, Enter to select, Esc closes panels, ARIA labels, and animations stop when the device asks for reduced motion.
+- **Works on phones:** touch rotate and pinch zoom, portrait framing, compact cards.
+- **Light on the device:** backgrounds are painted once per screen size, and 3D rendering pauses when scrolled out of view.
+- **Remembers you:** role, habitat, view and tour status are saved in the browser.
+
+## AI request limits
+
+The AI guide goes through the project's own endpoint (`/api/ask`), which enforces these limits:
+
+| Limit | Value | Effect |
+| --- | --- | --- |
+| Requests per visitor | **30 per 10 minutes** (configurable) | Beyond it the guide replies "Too many questions at once. Wait a moment and ask again." (HTTP 429) |
+| Requests per question | **1 to 4** | A plain answer is 1 request; each guide action (fly, pin, switch habitat) adds a round, up to 4. So a visitor gets roughly **8–30 questions per 10 minutes**. |
+| Conversation memory | Last **4 questions and answers** | Older turns are not sent, which keeps each request small |
+| Messages per request | **24** at most, about 150 KB in total | Larger requests are refused (HTTP 400) |
+| Answer length | 1,200 tokens (OpenAI-compatible services) or 4,000 (Anthropic, including the model's thinking) | Keeps answers short and costs predictable |
+| Scope | The server writes the instructions and allows only the three dashboard actions | The endpoint cannot be used as a general-purpose chatbot |
+| Upstream limits | Set by the AI provider's plan | A provider's own rate limit also shows as "Too many questions"; free tiers can run out quickly with several users |
+
+The per-visitor count is kept in memory on each server instance, so on serverless hosts with several instances it is approximate, not a hard cap.
+
+---
+
+## Project layout
+
+```
+public/        the website: index.html (layout and styles), app.js (behaviour), data.js (all PSI content), config.js
+api/ask.js     AI endpoint (serverless)
+lib/guide.js   AI logic: prompt, input checks, rate limit, provider calls
+server.js      AI endpoint and static server for Node hosts
+docs/SETUP.md  running locally, hosting, and AI service settings
+```
+
+Data source: [NASA Physical Sciences Informatics](https://psi.nasa.gov/physci/repo/search?q=combustion&data_source=psi&data_type=investigation). Descriptions are paraphrased from PSI records. 3D rendering uses three.js (MIT licence, in `public/vendor`).
