@@ -90,7 +90,7 @@ document.addEventListener("keydown", e => { if (e.key !== "Escape") return; clos
 function renderSky() {
   const H = HABITATS[state.habitat], pp = (H.p * H.o2 / 100).toFixed(2);
   $("#hab").innerHTML = `<div class="eyebrow">Crew environment <button class="link" id="why">why it matters</button></div><h2>${H.label}</h2>
-    <div class="nums"><span><b>${H.p}</b> psia</span><span><b>${H.o2}</b>% O₂</span><span>ppO₂ <b>${pp}</b></span></div><div class="why">${H.note}</div>`;
+    <div class="nums"><span><b>${H.p}</b> psia</span><span><b>${H.o2}</b>% O₂</span><span>ppO₂ <b>${pp}</b></span></div><div class="why">${H.note}</div>${matchMedia("(pointer: coarse)").matches ? `<div class="touch-hint">Swipe to rotate · pinch to zoom · tap a star</div>` : ""}`;
   $("#why").onclick = () => $("#hab").classList.toggle("show-why");
   const t = $("#top3"); t.innerHTML = `<div class="eyebrow">Closest to this need</div>`;
   ranked().filter(x => phaseOK(x.i)).slice(0, 3).forEach((x, n) => {
@@ -233,22 +233,41 @@ const scene = (() => {
   const beams = [0, 1, 2, 3, 4].map(() => { const ln = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3()]), beamMat.clone()); sc.add(ln); return ln; });
   const halo = new T.Mesh(new T.TorusGeometry(1, .035, 8, 64), new T.MeshBasicMaterial({ transparent: true, opacity: .9 })); sc.add(halo);
 
-  const ctl = { th: .9, ph: 1.12, r: 41, tgt: new T.Vector3(), goal: new T.Vector3(), rGoal: 41, idle: 0, off: 0, offGoal: 0 };
-  let dragging = null, moved = false, hover = null;
-  drag.addEventListener("pointerdown", e => { dragging = { x: e.clientX, y: e.clientY }; moved = false; drag.setPointerCapture(e.pointerId); });
+  // ctl.fit = distance that frames the whole constellation for this screen shape; ctl.zoom scales it (wheel, pinch, focus)
+  const ctl = { th: .9, ph: 1.12, fit: 41, zoom: 1, r: 41, tgt: new T.Vector3(), goal: new T.Vector3(), idle: 0, off: 0, offGoal: 0 };
+  const setZoom = z => { ctl.zoom = Math.min(1.5, Math.max(.25, z)); ctl.idle = 0; };
+  const ptrs = new Map(); let dragging = null, moved = false, hover = null, pinch = null;
+  drag.addEventListener("pointerdown", e => {
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); try { drag.setPointerCapture(e.pointerId); } catch (x) {}
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: ctl.zoom }; dragging = null; moved = true; }
+    else if (ptrs.size === 1) { dragging = { x: e.clientX, y: e.clientY, touch: e.pointerType !== "mouse" }; moved = false; }
+  });
   drag.addEventListener("pointermove", e => {
-    if (dragging) { const dx = e.clientX - dragging.x, dy = e.clientY - dragging.y; if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
-      ctl.th += dx * .005; ctl.ph = Math.min(2.6, Math.max(.35, ctl.ph - dy * .005)); dragging = { x: e.clientX, y: e.clientY }; ctl.idle = 0; }
-    else pick(e, false); });
-  drag.addEventListener("pointerup", e => { if (dragging && !moved) pick(e, true); dragging = null; });
-  host.addEventListener("wheel", e => { if (!e.target.closest("#drag")) return; if (!e.ctrlKey && !e.altKey && Math.abs(e.deltaY) < 40 && !e.shiftKey) {} e.preventDefault(); ctl.rGoal = Math.min(60, Math.max(10, ctl.rGoal * (1 + Math.sign(e.deltaY) * .08))); ctl.idle = 0; }, { passive: false });
+    if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && ptrs.size >= 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (d > 10) setZoom(pinch.z * pinch.d / d); return; }
+    if (dragging) { const dx = e.clientX - dragging.x, dy = e.clientY - dragging.y; if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+      ctl.th += dx * (dragging.touch ? .009 : .005); ctl.ph = Math.min(2.6, Math.max(.35, ctl.ph - dy * (dragging.touch ? .006 : .005)));
+      dragging.x = e.clientX; dragging.y = e.clientY; ctl.idle = 0; }
+    else if (e.pointerType === "mouse") pick(e, false);
+  });
+  const endPtr = e => { const tap = e.type === "pointerup" && dragging && !moved && !pinch; ptrs.delete(e.pointerId);
+    if (tap) pick(e, true); if (ptrs.size < 2) pinch = null; if (!ptrs.size) dragging = null; };
+  drag.addEventListener("pointerup", endPtr); drag.addEventListener("pointercancel", endPtr);
+  host.addEventListener("wheel", e => { if (!e.target.closest("#drag")) return; e.preventDefault(); setZoom(ctl.zoom * (1 + Math.sign(e.deltaY) * .08)); }, { passive: false });
   const ray = new T.Raycaster(), mv = new T.Vector2();
   function pick(e, click) {
     const r = renderer.domElement.getBoundingClientRect(); mv.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
-    ray.setFromCamera(mv, cam); const h = ray.intersectObjects(hits)[0]; hover = h ? h.object.userData.id : null;
+    ray.setFromCamera(mv, cam); ray.params.Points = { threshold: 1 };
+    const h = ray.intersectObjects(hits)[0]; hover = h ? h.object.userData.id : null;
     drag.style.cursor = hover ? "pointer" : ""; if (click && hover) select(hover);
   }
-  function resize() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+  function resize() {
+    const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
+    renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix();
+    // a portrait phone sees far less width, so step back until the rings fit across the screen
+    ctl.fit = Math.max(41, 13 / (Math.tan(23 * Math.PI / 180) * cam.aspect));
+  }
+  addEventListener("orientationchange", () => setTimeout(resize, 250));
   new ResizeObserver(resize).observe(host); resize();
 
   const v = new T.Vector3(), v2 = new T.Vector3(), up = new T.Vector3(); let t0 = performance.now(), visible = true;
@@ -257,7 +276,7 @@ const scene = (() => {
     requestAnimationFrame(frame); if (!visible) { t0 = now; return; }
     const dt = Math.min(50, now - t0); t0 = now; const t = now / 1000;
     ctl.idle += dt; if (!dragging && ctl.idle > 2500 && !reduced) ctl.th += dt * .00004;
-    ctl.tgt.lerp(ctl.goal, .05); ctl.r += (ctl.rGoal - ctl.r) * .06; ctl.off += (ctl.offGoal - ctl.off) * .07;
+    ctl.tgt.lerp(ctl.goal, .05); ctl.r += (ctl.fit * ctl.zoom - ctl.r) * .06; ctl.off += (ctl.offGoal - ctl.off) * .07;
     cam.position.set(ctl.tgt.x + ctl.r * Math.sin(ctl.ph) * Math.cos(ctl.th), ctl.tgt.y + ctl.r * Math.cos(ctl.ph), ctl.tgt.z + ctl.r * Math.sin(ctl.ph) * Math.sin(ctl.th));
     cam.lookAt(ctl.tgt);
     const W = host.clientWidth, Hh = host.clientHeight, wide = W > 900 ? .1 : 0;
@@ -273,7 +292,7 @@ const scene = (() => {
       const show = v.z < 1 && (!n.ground || id === state.selected || id === hover);
       n.lb.style.display = show ? "" : "none";
       if (show) { n.lb.style.left = ((v.x + 1) / 2 * W) + "px"; n.lb.style.top = ((1 - v.y) / 2 * Hh) + "px"; n.lb.style.transform = "";
-        const d = cam.position.distanceTo(n.pos); n.lb.style.opacity = (id === state.selected || id === hover) ? 1 : Math.max(.12, Math.min(1, 1.7 - d / 34)) * (n.dimmed ? .25 : 1);
+        const d = cam.position.distanceTo(n.pos); n.lb.style.opacity = (id === state.selected || id === hover) ? 1 : Math.max(.12, Math.min(1, 1.7 - d * (41 / ctl.fit) / 34)) * (n.dimmed ? .25 : 1);
         n.lb.classList.toggle("sel", id === state.selected); }
     }
     for (const id in pinEls) { const n = nodes[id], e = pinEls[id]; if (!n) continue; v.copy(n.pos).project(cam);
@@ -318,7 +337,7 @@ const scene = (() => {
       }
       ranked().filter(x => phaseOK(x.i)).slice(0, 5).forEach((x, i) => beams[i].geometry.setFromPoints([new T.Vector3(), nodes[x.i.id].pos]));
     },
-    focus(id) { const n = nodes[id]; if (!n) return; ctl.goal.copy(n.pos).multiplyScalar(.55); ctl.rGoal = 23; ctl.idle = 0; },
+    focus(id) { const n = nodes[id]; if (!n) return; ctl.goal.copy(n.pos).multiplyScalar(cam.aspect < 1 ? .3 : .55); setZoom(cam.aspect < 1 ? .9 : .56); },
     shift(x) { ctl.offGoal = x; },
     setPins(ids) {
       for (const id in pinEls) if (!ids.includes(id)) { pinEls[id].remove(); delete pinEls[id]; }

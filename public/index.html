@@ -87,7 +87,8 @@ h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance}
 .lbl{position:absolute;transform:translate(-50%,-160%);font-family:var(--mono);font-size:10.5px;white-space:nowrap;text-shadow:var(--label-shadow);color:var(--ink);transition:opacity .25s}
 .lbl.st{font-family:var(--display);font-style:italic;font-size:17px;color:var(--mute);transform:translate(-50%,45%)}
 .lbl.sel{font-weight:500}
-.drag{position:absolute;inset:0;cursor:grab;z-index:3}
+.drag{position:absolute;inset:0;cursor:grab;z-index:3;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.touch-hint{font-family:var(--mono);font-size:10.5px;color:var(--mute);margin-top:8px;letter-spacing:.04em}
 #pins{position:absolute;inset:0;pointer-events:none;z-index:4}
 .astro{position:absolute;width:40px;height:56px;transform:translate(-48%,-94%);pointer-events:auto;cursor:pointer;border:0;background:none;padding:0;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));transition:opacity .25s}
 .astro svg{width:100%;height:100%;display:block;overflow:visible}
@@ -320,11 +321,26 @@ footer a{color:var(--mute)}
 .tip .goal:hover{border-color:var(--line-strong)}
 
 @media (max-width:900px){
-  .bar{padding:12px 14px;flex-wrap:wrap}
+  .bar{padding:10px 12px;flex-wrap:wrap;gap:8px}
+  .brand{width:100%}
+  .brand h1{font-size:22px}
+  .menu-btn{padding:6px 10px;font-size:12px;gap:6px}
+  .menu-btn .eyebrow{display:none}
+  .menu-wrap:nth-of-type(2) .menu{right:auto;left:0}
+  .mode{width:32px;height:32px}
   .brand span{display:none}
-  .hab{top:120px;left:16px} .hab h2{font-size:34px}
   .top3{display:none}
-  .mini{left:16px;right:16px;width:auto;bottom:84px}
+  .mini{left:12px;right:12px;width:auto;bottom:76px;padding:12px 14px;gap:8px}
+  .mini .specimen,.mini > p{display:none}
+  .mini h3{font-size:22px}
+  .mini .score{font-size:20px}
+  .mini .match{font-size:12px}
+  .hab{top:104px;left:14px;right:14px;max-width:none}
+  .hab h2{font-size:30px}
+  .orb{right:12px;bottom:12px}
+  .orb .t small{display:none}
+  :root[data-mode="light"] .hab{top:110px;padding:10px 14px}
+  :root[data-mode="light"] .hab h2{font-size:26px}
   .legend,.cue,.navdots{display:none}
   .chapter{grid-template-columns:1fr;gap:28px;padding:80px 18px;min-height:0}
   .vh{grid-template-columns:1fr}
