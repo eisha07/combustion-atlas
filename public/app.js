@@ -658,7 +658,7 @@ async function askApi(q, out, acts) {
   for (let round = 0; round < 4; round++) {
     const r = await fetch(CFG.aiEndpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ context, messages }) });
     if (r.status === 429) { const e = new Error("rate"); e.code = "rate_limited"; throw e; }
-    if (!r.ok) { const e = new Error("http " + r.status); e.code = "http"; throw e; }
+    if (!r.ok) { let d = {}; try { d = await r.json(); } catch (x) {} const e = new Error("http " + r.status); e.code = "http"; e.reason = [d.error, d.detail].filter(Boolean).join(": ") || ("HTTP " + r.status); throw e; }
     const res = await r.json();
     const blocks = Array.isArray(res.content) ? res.content : [];
     messages.push({ role: "assistant", content: blocks });
@@ -688,7 +688,12 @@ async function ask(q) {
   } catch (err) {
     if (err && err.code === "not_granted") { sampleFn = null; aiMode = "off"; out.textContent = localAnswer(q); }
     else if (err && err.code === "rate_limited") out.textContent = "Too many questions at once. Wait a moment and ask again.";
-    else { out.textContent = localAnswer(q); addMsg("sys", "The live guide could not be reached, so this answer comes from the desk's own data."); }
+    else {
+      out.textContent = localAnswer(q);
+      const why = location.protocol === "file:" ? "the page was opened as a file; run npm start and open http://localhost:3000"
+        : (err && err.reason) || (err instanceof TypeError ? "the server is not running or /api/ask is unreachable" : (err && err.message) || "unknown error");
+      addMsg("sys", `The live guide could not be reached (${why}), so this answer comes from the desk's own data.`);
+    }
   }
   if (acts.length) { const a = el("span", { class: "act" }); a.textContent = acts.join(" · "); out.append(a); }
   busy = false; $("#asend").disabled = false;
