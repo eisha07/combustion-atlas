@@ -1,0 +1,9 @@
+{
+  "outputDirectory": "public",
+  "functions": {
+    "api/ask.js": {
+      "includeFiles": "public/data.js",
+      "maxDuration": 30
+    }
+  }
+}
