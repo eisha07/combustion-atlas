@@ -4,7 +4,7 @@
 
 Built for the NASA Physical Sciences Informatics (PSI) challenge: summarize, rank and interpret PSI combustion research to inform fire safety for spacecraft, space stations, lunar and Martian bases, pressurized rovers and spacesuits, and fire safety back on Earth.
 
-Audience: professors, graduate and undergraduate students, aerospace researchers and aerospace engineers. Each role gets its own guide.
+Audience: professors, graduate and undergraduate students, aerospace researchers and aerospace engineers. Each role gets its own guide and depending on the role, functionality of the dashboard changes minimally. 
 
 ---
 
@@ -62,7 +62,7 @@ The ratings are an editorial judgement, and users can re-weight them live with s
 ### Understand one investigation
 - **Card:** relevance score, fire-safety takeaway, and an **O₂ coverage pill** (green: tested at or above the habitat's O₂; amber: close; red: short), plus whether the habitat's pressure was tested.
 - **Animated specimen view:** a schematic of the experiment itself: spherical and cool flames, a droplet burning down by the d² law, coflow jet flames, electric-field flames, a flat burner that keeps burning in elevated O₂, a flame front spreading over fabric, smoke particles growing, dust aerosol.
-- **Full dossier:** objective, fuels, sample size, O₂, pressure, flow, team, **what was varied vs held constant**, sensors, a radar chart of why it ranks where it does, connected studies, and the PSI link.
+- **Full dossier:** objective, fuels, sample size, O₂, pressure, flow, team, **what was varied vs held constant**, sensors, a radar chart of why it ranks where it does, connected studies, and the PSI link. The full dossier can be collapsed to allow more space on the dashboard.
 
 ### Compare
 - **Pin up to three** investigations. Each pinned star gets a small astronaut standing on it with a flag and shadow.
